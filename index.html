@@ -1,0 +1,219 @@
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { jsPDF } from "jspdf";
+import * as XLSX from "xlsx";
+
+// Data rumus dasar
+const rumusData = {
+  Matematika: [
+    { nama: "Pythagoras", rumus: "a² + b² = c²", contoh: "a=3, b=4 → c=5" },
+    { nama: "Luas Lingkaran", rumus: "πr²", contoh: "r=7 → 154" }
+  ],
+  Fisika: [
+    { nama: "Gaya", rumus: "F = m × a", contoh: "m=2, a=10 → F=20N" },
+    { nama: "Energi Kinetik", rumus: "Ek = 1/2 mv²", contoh: "m=2, v=4 → 16J" }
+  ],
+  Kimia: [
+    { nama: "Mol", rumus: "n = m/Mr", contoh: "m=20g, Mr=10 → 2 mol" }
+  ],
+  Biologi: [
+    { nama: "BMI", rumus: "BMI = kg/m²", contoh: "70kg/1.75² → 22.9" }
+  ]
+};
+
+export default function EduTools() {
+  const [nilai, setNilai] = useState({ tugas: "", uts: "", uas: "" });
+  const [hasil, setHasil] = useState(null);
+  const [ranking, setRanking] = useState([]);
+  const [ipk, setIpk] = useState({ sks: "", bobot: "" });
+  const [hasilIpk, setHasilIpk] = useState(null);
+  const [pencarian, setPencarian] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [bahasa, setBahasa] = useState("id");
+
+  // Hitung nilai rata-rata
+  const hitungNilai = () => {
+    const rata =
+      (Number(nilai.tugas) + Number(nilai.uts) + Number(nilai.uas)) / 3;
+    setHasil(rata.toFixed(2));
+  };
+
+  // Hitung IPK sederhana
+  const hitungIpk = () => {
+    const ipkCalc = Number(ipk.bobot) / Number(ipk.sks);
+    setHasilIpk(ipkCalc.toFixed(2));
+  };
+
+  // Ekspor ke PDF
+  const eksporPDF = (judul, data) => {
+    const doc = new jsPDF();
+    doc.text(judul, 10, 10);
+    data.forEach((d, i) => {
+      doc.text(`${i + 1}. ${d}`, 10, 20 + i * 10);
+    });
+    doc.save(judul + ".pdf");
+  };
+
+  // Ekspor ke Excel
+  const eksporExcel = (judul, data) => {
+    const ws = XLSX.utils.aoa_to_sheet([[judul], ...data.map((d, i) => [i + 1, d])]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, judul + ".xlsx");
+  };
+
+  // Cari rumus berdasarkan input
+  const hasilCari = [];
+  Object.keys(rumusData).forEach((mapel) => {
+    rumusData[mapel].forEach((r) => {
+      if (r.nama.toLowerCase().includes(pencarian.toLowerCase())) {
+        hasilCari.push({ mapel, ...r });
+      }
+    });
+  });
+
+  return (
+    <div className={darkMode ? "bg-gray-900 text-white min-h-screen p-6" : "bg-white text-black min-h-screen p-6"}>
+      <div className="flex justify-between mb-4">
+        <Button onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? "☀️ Light" : "🌙 Dark"}
+        </Button>
+        <Button onClick={() => setBahasa(bahasa === "id" ? "en" : "id")}>🌐 {bahasa === "id" ? "EN" : "ID"}</Button>
+      </div>
+      <Tabs defaultValue="nilai">
+        <TabsList>
+          <TabsTrigger value="nilai">Kalkulator Nilai</TabsTrigger>
+          <TabsTrigger value="ranking">Ranking</TabsTrigger>
+          <TabsTrigger value="ipk">IPK</TabsTrigger>
+          <TabsTrigger value="rumus">Cari Rumus</TabsTrigger>
+          <TabsTrigger value="flash">Flashcard</TabsTrigger>
+          <TabsTrigger value="konversi">Converter</TabsTrigger>
+        </TabsList>
+
+        {/* Kalkulator Nilai */}
+        <TabsContent value="nilai">
+          <Card>
+            <CardContent className="space-y-2">
+              <Input placeholder="Nilai Tugas" onChange={(e) => setNilai({ ...nilai, tugas: e.target.value })} />
+              <Input placeholder="Nilai UTS" onChange={(e) => setNilai({ ...nilai, uts: e.target.value })} />
+              <Input placeholder="Nilai UAS" onChange={(e) => setNilai({ ...nilai, uas: e.target.value })} />
+              <Button onClick={hitungNilai}>Hitung</Button>
+              {hasil && (
+                <div>
+                  Rata-rata: {hasil}
+                  <div className="flex gap-2 mt-2">
+                    <Button onClick={() => eksporPDF("Hasil Nilai", ["Rata-rata: " + hasil])}>Ekspor PDF</Button>
+                    <Button onClick={() => eksporExcel("Hasil Nilai", ["Rata-rata: " + hasil])}>Ekspor Excel</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Ranking */}
+        <TabsContent value="ranking">
+          <Card>
+            <CardContent>
+              <textarea className="w-full border p-2" rows="5" placeholder="Masukkan daftar nilai (pisahkan dengan koma)"
+                onChange={(e) => setRanking(e.target.value.split(",").map(Number))}></textarea>
+              <Button className="mt-2" onClick={() => setRanking([...ranking].sort((a, b) => b - a))}>Hitung Ranking</Button>
+              {ranking.length > 0 && (
+                <div>
+                  <ul>
+                    {ranking.map((r, i) => (
+                      <li key={i}>{i + 1}. {r}</li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2 mt-2">
+                    <Button onClick={() => eksporPDF("Ranking Kelas", ranking.map((r, i) => `${i + 1}. ${r}`))}>Ekspor PDF</Button>
+                    <Button onClick={() => eksporExcel("Ranking Kelas", ranking.map((r, i) => `${i + 1}. ${r}`))}>Ekspor Excel</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* IPK */}
+        <TabsContent value="ipk">
+          <Card>
+            <CardContent className="space-y-2">
+              <Input placeholder="Total SKS" onChange={(e) => setIpk({ ...ipk, sks: e.target.value })} />
+              <Input placeholder="Total Bobot Nilai" onChange={(e) => setIpk({ ...ipk, bobot: e.target.value })} />
+              <Button onClick={hitungIpk}>Hitung IPK</Button>
+              {hasilIpk && (
+                <div>
+                  IPK: {hasilIpk}
+                  <div className="flex gap-2 mt-2">
+                    <Button onClick={() => eksporPDF("Hasil IPK", ["IPK: " + hasilIpk])}>Ekspor PDF</Button>
+                    <Button onClick={() => eksporExcel("Hasil IPK", ["IPK: " + hasilIpk])}>Ekspor Excel</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Cari Rumus */}
+        <TabsContent value="rumus">
+          <Card>
+            <CardContent>
+              <Input placeholder="Cari rumus..." onChange={(e) => setPencarian(e.target.value)} />
+              <ul>
+                {hasilCari.map((r, i) => (
+                  <li key={i}><b>{r.mapel}:</b> {r.nama} = {r.rumus} (Contoh: {r.contoh})</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Flashcards */}
+        <TabsContent value="flash">
+          <Card>
+            <CardContent className="space-y-2">
+              {Object.keys(rumusData).map((mapel) => (
+                <div key={mapel}>
+                  <h3 className="font-bold">{mapel}</h3>
+                  {rumusData[mapel].map((r, i) => (
+                    <Flashcard key={i} rumus={r} />
+                  ))}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Converter */}
+        <TabsContent value="konversi">
+          <Card>
+            <CardContent>
+              <h3 className="font-bold mb-2">BMI Calculator</h3>
+              <Input placeholder="Berat (kg)" id="berat" type="number" />
+              <Input placeholder="Tinggi (m)" id="tinggi" type="number" />
+              <Button className="mt-2" onClick={() => {
+                const berat = document.getElementById("berat").value;
+                const tinggi = document.getElementById("tinggi").value;
+                const bmi = (berat / (tinggi * tinggi)).toFixed(2);
+                alert("BMI: " + bmi);
+              }}>Hitung BMI</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function Flashcard({ rumus }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div onClick={() => setShow(!show)} className="border p-2 my-1 rounded cursor-pointer">
+      {!show ? rumus.nama : `${rumus.rumus} | Contoh: ${rumus.contoh}`}
+    </div>
+  );
+}
