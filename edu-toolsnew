@@ -1,0 +1,255 @@
+import React, { useState } from "react";
+import { jsPDF } from "jspdf";
+import * as XLSX from "xlsx";
+
+// Data rumus dasar
+const rumusData = {
+  Matematika: [
+    { nama: "Pythagoras", rumus: "a² + b² = c²", contoh: "a=3, b=4 → c=5" },
+    { nama: "Luas Lingkaran", rumus: "πr²", contoh: "r=7 → 154" },
+  ],
+  Fisika: [
+    { nama: "Gaya", rumus: "F = m × a", contoh: "m=2, a=10 → F=20N" },
+    { nama: "Energi Kinetik", rumus: "Ek = 1/2 mv²", contoh: "m=2, v=4 → 16J" },
+  ],
+  Kimia: [{ nama: "Mol", rumus: "n = m/Mr", contoh: "m=20g, Mr=10 → 2 mol" }],
+  Biologi: [{ nama: "BMI", rumus: "BMI = kg/m²", contoh: "70kg/1.75² → 22.9" }],
+};
+
+function Flashcard({ rumus }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div
+      onClick={() => setShow(!show)}
+      style={{
+        border: "1px solid #ccc",
+        padding: "8px",
+        margin: "4px 0",
+        borderRadius: "4px",
+        cursor: "pointer",
+      }}
+    >
+      {!show ? rumus.nama : `${rumus.rumus} | Contoh: ${rumus.contoh}`}
+    </div>
+  );
+}
+
+export default function EduTools() {
+  const [nilai, setNilai] = useState({ tugas: "", uts: "", uas: "" });
+  const [hasil, setHasil] = useState(null);
+  const [ranking, setRanking] = useState([]);
+  const [ipk, setIpk] = useState({ sks: "", bobot: "" });
+  const [hasilIpk, setHasilIpk] = useState(null);
+  const [pencarian, setPencarian] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [bahasa, setBahasa] = useState("id");
+
+  // Hitung nilai rata-rata
+  const hitungNilai = () => {
+    const rata =
+      (Number(nilai.tugas) + Number(nilai.uts) + Number(nilai.uas)) / 3;
+    setHasil(rata.toFixed(2));
+  };
+
+  // Hitung IPK
+  const hitungIpk = () => {
+    const ipkCalc = Number(ipk.bobot) / Number(ipk.sks);
+    setHasilIpk(ipkCalc.toFixed(2));
+  };
+
+  // Ekspor PDF
+  const eksporPDF = (judul, data) => {
+    const doc = new jsPDF();
+    doc.text(judul, 10, 10);
+    data.forEach((d, i) => {
+      doc.text(`${i + 1}. ${d}`, 10, 20 + i * 10);
+    });
+    doc.save(judul + ".pdf");
+  };
+
+  // Ekspor Excel
+  const eksporExcel = (judul, data) => {
+    const ws = XLSX.utils.aoa_to_sheet([[judul], ...data.map((d, i) => [i + 1, d])]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, judul + ".xlsx");
+  };
+
+  // Cari rumus
+  const hasilCari = [];
+  Object.keys(rumusData).forEach((mapel) => {
+    rumusData[mapel].forEach((r) => {
+      if (r.nama.toLowerCase().includes(pencarian.toLowerCase())) {
+        hasilCari.push({ mapel, ...r });
+      }
+    });
+  });
+
+  return (
+    <div
+      style={{
+        padding: "20px",
+        fontFamily: "Arial",
+        backgroundColor: darkMode ? "#222" : "#f9f9f9",
+        color: darkMode ? "#fff" : "#000",
+      }}
+    >
+      <h1>EduTools</h1>
+
+      {/* Mode Gelap & Bahasa */}
+      <button onClick={() => setDarkMode(!darkMode)}>
+        {darkMode ? "☀️ Light" : "🌙 Dark"}
+      </button>
+      <button
+        onClick={() => setBahasa(bahasa === "id" ? "en" : "id")}
+        style={{ marginLeft: "10px" }}
+      >
+        🌐 {bahasa === "id" ? "EN" : "ID"}
+      </button>
+
+      <hr />
+
+      {/* Kalkulator Nilai */}
+      <h2>Kalkulator Nilai</h2>
+      <input
+        type="number"
+        placeholder="Nilai Tugas"
+        value={nilai.tugas}
+        onChange={(e) => setNilai({ ...nilai, tugas: e.target.value })}
+      />
+      <input
+        type="number"
+        placeholder="Nilai UTS"
+        value={nilai.uts}
+        onChange={(e) => setNilai({ ...nilai, uts: e.target.value })}
+      />
+      <input
+        type="number"
+        placeholder="Nilai UAS"
+        value={nilai.uas}
+        onChange={(e) => setNilai({ ...nilai, uas: e.target.value })}
+      />
+      <button onClick={hitungNilai}>Hitung</button>
+      {hasil && (
+        <div>
+          Rata-rata: {hasil} <br />
+          <button onClick={() => eksporPDF("Hasil Nilai", ["Rata-rata: " + hasil])}>
+            Ekspor PDF
+          </button>
+          <button
+            onClick={() => eksporExcel("Hasil Nilai", ["Rata-rata: " + hasil])}
+          >
+            Ekspor Excel
+          </button>
+        </div>
+      )}
+
+      <hr />
+
+      {/* Ranking */}
+      <h2>Ranking</h2>
+      <input
+        type="text"
+        placeholder="Masukkan nilai, pisah dengan koma"
+        onChange={(e) =>
+          setRanking(e.target.value.split(",").map((v) => Number(v.trim())))
+        }
+      />
+      <button onClick={() => setRanking([...ranking].sort((a, b) => b - a))}>
+        Hitung Ranking
+      </button>
+      {ranking.length > 0 && (
+        <div>
+          {ranking.map((r, i) => (
+            <div key={i}>
+              {i + 1}. {r}
+            </div>
+          ))}
+          <button onClick={() => eksporPDF("Ranking Kelas", ranking)}>Ekspor PDF</button>
+          <button onClick={() => eksporExcel("Ranking Kelas", ranking)}>Ekspor Excel</button>
+        </div>
+      )}
+
+      <hr />
+
+      {/* IPK */}
+      <h2>IPK</h2>
+      <input
+        type="number"
+        placeholder="Total SKS"
+        value={ipk.sks}
+        onChange={(e) => setIpk({ ...ipk, sks: e.target.value })}
+      />
+      <input
+        type="number"
+        placeholder="Total Bobot Nilai"
+        value={ipk.bobot}
+        onChange={(e) => setIpk({ ...ipk, bobot: e.target.value })}
+      />
+      <button onClick={hitungIpk}>Hitung IPK</button>
+      {hasilIpk && (
+        <div>
+          IPK: {hasilIpk} <br />
+          <button onClick={() => eksporPDF("Hasil IPK", ["IPK: " + hasilIpk])}>
+            Ekspor PDF
+          </button>
+          <button onClick={() => eksporExcel("Hasil IPK", ["IPK: " + hasilIpk])}>
+            Ekspor Excel
+          </button>
+        </div>
+      )}
+
+      <hr />
+
+      {/* Cari Rumus */}
+      <h2>Cari Rumus</h2>
+      <input
+        type="text"
+        placeholder="Cari rumus..."
+        value={pencarian}
+        onChange={(e) => setPencarian(e.target.value)}
+      />
+      <div>
+        {hasilCari.map((r, i) => (
+          <div key={i}>
+            {r.mapel}: {r.nama} = {r.rumus} (Contoh: {r.contoh})
+          </div>
+        ))}
+      </div>
+
+      <hr />
+
+      {/* Flashcard */}
+      <h2>Flashcard</h2>
+      {Object.keys(rumusData).map((mapel) => (
+        <div key={mapel}>
+          <h3>{mapel}</h3>
+          {rumusData[mapel].map((r, i) => (
+            <Flashcard key={i} rumus={r} />
+          ))}
+        </div>
+      ))}
+
+      <hr />
+
+      {/* BMI Calculator */}
+      <h2>BMI Calculator</h2>
+      <input type="number" placeholder="Berat (kg)" id="berat" />
+      <input type="number" placeholder="Tinggi (m)" id="tinggi" />
+      <button
+        onClick={() => {
+          const berat = parseFloat(document.getElementById("berat").value);
+          const tinggi = parseFloat(document.getElementById("tinggi").value);
+          if (berat && tinggi) {
+            const bmi = (berat / (tinggi * tinggi)).toFixed(2);
+            alert("BMI: " + bmi);
+          } else {
+            alert("Masukkan berat dan tinggi!");
+          }
+        }}
+      >
+        Hitung BMI
+      </button>
+    </div>
+  );
+}
